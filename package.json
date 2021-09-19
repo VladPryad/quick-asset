@@ -1,0 +1,25 @@
+{
+  "name": "quick-asset",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Tool for quick asset issuing on Stellar network.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "stellar",
+    "blockchain",
+    "wallet",
+    "asset",
+    "node.js"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "lodash": "^4.17.21",
+    "path": "^0.12.7",
+    "stellar-sdk": "^8.3.0",
+    "yaml": "^1.10.2"
+  }
+}
