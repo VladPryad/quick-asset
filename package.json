@@ -1,22 +1,38 @@
 {
-  "name": "quick-asset",
-  "type": "module",
-  "version": "1.0.0",
-  "description": "Tool for quick asset issuing on Stellar network.",
-  "main": "index.js",
+  "name": "@vladpryad/quick",
+  "version": "1.0.1",
+  "description": "CLI tool for quick asset issuing on Stellar network.",
+  "main": "src/index.js",
+  "bin": {
+    "@vladpryad/quick": "bin/quick.js",
+    "quick": "bin/quick.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "config.js"
+  ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
+    "cli",
     "stellar",
     "blockchain",
     "wallet",
     "asset",
     "node.js"
   ],
-  "author": "",
+  "author": "Vlad Pryadko",
   "license": "ISC",
   "dependencies": {
+    "arg": "^5.0.1",
+    "chalk": "^4.1.2",
+    "esm": "^3.2.25",
+    "inquirer": "^8.1.5",
     "lodash": "^4.17.21",
     "path": "^0.12.7",
     "stellar-sdk": "^8.3.0",

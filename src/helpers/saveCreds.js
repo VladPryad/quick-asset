@@ -13,6 +13,5 @@ ASSET_ISSUER_SECRET=${asset.issuer.secret()} \r\n\
 ASSET_DISTRIBUTOR_PUBLIC=${asset.distributor.publicKey()} \r\n\
 ASSET_DISTRIBUTOR_SECRET=${asset.distributor.secret()}\r\n\r\n`
 
-    //fs.writeFileSync();
     fs.appendFileSync(path.join(__dirname, CREDS_FILE), payload)
 }
