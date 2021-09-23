@@ -12,14 +12,14 @@ passphrase: Public Global Stellar Network ; September 2015</code>
 # assetfile.yaml
 Declares assets, that needs to be created (alphanum12/alphanum4 - does not matter)  <br/>
 ```
-assets:  <br/>
-  - code: Nastya  <br/>
-    issuer: KBKJBHJKBHJVDBKJLCB  <br/>
-    distributor: HJBKJHBJ  <br/>
-  - code: Nastya  <br/>
-    issuer: SC6R773OZEEHP4T5QUV3RDGNYYFW5H3HZ5PS6QOWWFPSENSVL3 <br/>
-    distributor: SCC577JZZ5KJDRSXRV7P7SDZFUVDWGQVKXUIB27ORVXP  <br/>
-  - code: Vlad  <br/>
+assets:  
+  - code: Nastya  
+    issuer: KBKJBHJKBHJVDBKJLCB  
+    distributor: HJBKJHBJ  
+  - code: Nastya  
+    issuer: SC6R773OZEEHP4T5QUV3RDGNYYFW5H3HZ5PS6QOWWFPSENSVL3 
+    distributor: SCC577JZZ5KJDRSXRV7P7SDZFUVDWGQVKXUIB27ORVXP  
+  - code: Vlad  
     issuer:   
 ```
 All invalid (e.g. empty) public keys will be replaced with random keys.
