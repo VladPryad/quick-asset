@@ -6,9 +6,9 @@ You need to create TWO files:
 # stellarfile.yaml
 Consists of declaration of the network you are using.
 Minimum content - one line (if it's test or public network)  
-```network: test    
+<code>network: test    
 horizon: https://horizon-testnet.stellar.org    
-passphrase: Public Global Stellar Network ; September 2015```  
+passphrase: Public Global Stellar Network ; September 2015</code>
 # assetfile.yaml
 Declares assets, that needs to be created (alphanum12/alphanum4 - does not matter)  <br/>
 <code>assets:  <br/>
