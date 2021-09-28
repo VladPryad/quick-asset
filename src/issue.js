@@ -15,22 +15,9 @@ import {
     TEST_HORIZON_PASSPHRASE
  } from "../config.js";
 
- import saveCreds from "./helpers/saveCreds.js";
+import saveCreds from "./helpers/saveCreds.js";
+import { initHorizon } from "./helpers/horizon.js";
 
-
-function initHorizon() {
-    if (getConfig("network") === "public") return new Server(PUBLIC_HORIZON_URL);
-
-    if (getConfig("network") === "custom") {
-        if (!getConfig("horizon") || !getConfig("passphrase")) {
-            console.log("No custom horizon provided, using testnet.")
-        } else {
-            return new Server(getConfig("horizon"));
-        }
-    }
-
-    return new Server(TEST_HORIZON_URL);
-}
 async function initAsset(asset) {
     if( !asset.issuer) {
         console.log(`No issuer for ${asset.code}, using random.`)
@@ -52,10 +39,11 @@ async function initAsset(asset) {
         asset.distributor = Keypair.fromSecret(asset.distributor); 
     }
 
-    await fundAccount(asset.issuer); // TODO: Only for testnet
+    await fundAccount(asset.issuer); // TODO: Only for testnet, no need to fund existing accounts
     await fundAccount(asset.distributor); // TODO: Only for testnet
 }
-const fundAccount = async (pair) => {
+
+export const fundAccount = async (pair) => {
     return Horizon.friendbot(pair.publicKey()).call();
 };
 
@@ -89,17 +77,19 @@ const distributeAsset = async (asset, fee) => {
         .addOperation(Operation.payment({
             destination: asset.distributor.publicKey(),
             asset: new Asset(asset.code, asset.issuer.publicKey()),
-            amount: '100000000', // TODO: Should be changeable
+            amount: '10000000000', // TODO: Should be changeable
         }))
         .setTimeout(30)
         .build();
 
-    transaction.sign(asset.issuer.secret());
+    transaction.sign(asset.issuer);
 
     return Horizon.submitTransaction(transaction);
 };
 
 export async function issue(code) {
+    console.log("========== ISSUING ==========");
+
     const fee = await Horizon.fetchBaseFee();
     console.log('FEE: ', fee);
 
@@ -113,6 +103,9 @@ export async function issue(code) {
 
             console.log(`[${asset.code}]:`,"Changing distributors trustlines.")
             await createDistributor(asset, fee);
+
+            console.log(`[${asset.code}]:`,"Distributing asset.")
+            await distributeAsset(asset, fee);
         });
     }
 }

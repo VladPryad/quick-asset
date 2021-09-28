@@ -1,5 +1,6 @@
 import arg from 'arg';
 import { issue as startIssue } from './index.js';
+import { populate as startPopulate } from './populate.js';
 
 function parseArgumentsIntoOptions(rawArgs) {
  const args = arg(
@@ -31,7 +32,7 @@ export function cli(args) {
             console.error("Not implemented");
             break;
         case populate:
-            console.error("Not implemented");
+            startPopulate();
             break;
         case issue:
             startIssue();

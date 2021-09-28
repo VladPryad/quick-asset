@@ -33,3 +33,7 @@ export function getAssets(code) {
 
     return matches[0];
 }
+
+export function getPairs() {
+    return assets.pairs;
+}
