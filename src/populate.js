@@ -17,8 +17,9 @@ import {
 
 import saveCreds from "./helpers/saveCreds.js";
 import { initHorizon } from "./helpers/horizon.js";
+import _ from "lodash";
+const R = require('ramda');
 
-const _ = require('lodash');
 const { BigNumber } = require('bignumber.js');
 
 import { fundAccount } from "./issue.js";
@@ -33,6 +34,8 @@ const FEE_VOLUME_START = '0.2';
 const FEE_ITERATION = 2; // 75
 
 const changeTrust = async (trustor, asset, fee) => {
+
+    console.log("Allowing trust on " + asset.code);
 
     const account = await Horizon.loadAccount(trustor.publicKey());
 
@@ -52,7 +55,14 @@ const changeTrust = async (trustor, asset, fee) => {
     }
 };
 
+const initiatedAssets = [];
+
 export async function initAsset(asset) {
+    const existingAsset = _.find(initiatedAssets, el => el.asset.code == asset.code && el.issuer.publicKey() == asset.issuer);
+    if ( existingAsset ) return existingAsset;
+
+    console.log(initiatedAssets)
+
     if( !asset.issuer) {
         console.log(`No issuer for ${asset.code}, using random.`)
         asset.issuer = Keypair.random();
@@ -73,35 +83,82 @@ export async function initAsset(asset) {
         asset.distributor = Keypair.fromSecret(asset.distributor); 
     }
 
-    // TODO: not fund account if it exists
-    //await fundAccount(asset.issuer); // TODO: Only for testnet, no need to fund existing accounts
-    //await fundAccount(asset.distributor); // TODO: Only for testnet
+    console.log("Checking if accounts exist...");
+
+    if ( !(await accountExists(asset.issuer))) fundAccount(asset.issuer);
+    if ( !(await accountExists(asset.distributor))) await fundAccount(asset.distributor);
 
     asset.asset = new Asset(asset.code, asset.issuer.publicKey());
+
+    initiatedAssets.push(asset);
 
     return asset;
 }
 
 async function preparePairs(raw) {
     const pairs = [];
+    const fee = await Horizon.fetchBaseFee();
+    function makePairs(arr) {
+        var res = [],
+            l = arr.length;
+        for(var i=0; i<l; ++i)
+            for(var j=i+1; j<l; ++j)
+                res.push([arr[i], arr[j]]);
+        return res;
+    }
+    const crossPairsSequential = makePairs(raw.cross);
+    const rawPairs = [
+    ...raw.single,
+    ...crossPairsSequential.map(el => ({buying: el[0], selling: el[1] })),
+    ...crossPairsSequential.map(el => ({buying: el[1], selling: el[0] })) ];
+
     function createPair(pair) {
         return new Promise(async (res, rej) => {
             const buying = await initAsset(pair.buying);
             const selling = await initAsset(pair.selling);
+
             pairs.push({
                 buying,
                 selling,
             })
-            pairs.push({
-                buying: selling,
-                selling: buying,
-            })
             res(true);
         })
     }
-    const promises = raw.single.map(createPair)
+
+    function changeTrustlines(pair) {
+        return new Promise(async (res, rej) => {
+            console.log(`Checking trustlines between ${pair.buying.asset.code} and ${pair.selling.asset.code} distributors ...`);
+            if (!(await checkTrustline(pair.buying.distributor, pair.selling.asset))) {
+                await changeTrust(pair.buying.distributor, pair.selling.asset, fee);
+            }
+            if (!(await checkTrustline(pair.selling.distributor, pair.buying.asset))) {
+                await changeTrust(pair.selling.distributor, pair.buying.asset, fee);
+            }
+            res(true);
+        })
+    }
+
+    const promises = raw.single.map(createPair) // rawPairs
+
     return Promise.all(promises)
-    .then(() => pairs);
+    .then(() => pairs)
+    .then(pairs => {
+        const promisesTrust = pairs.map(changeTrustlines);
+        return Promise.all(promisesTrust)
+        .then(() => pairs);
+    })
+
+    // TODO: remove repetitive elements
+}
+
+async function accountExists(acc) {
+    try {
+        await Horizon.loadAccount(acc.publicKey());
+    } catch(e) {
+        return false;
+    }
+
+    return true;
 }
 
  const prepareOrderbook = async (fee, buying, selling) => {
@@ -148,9 +205,15 @@ async function preparePairs(raw) {
     return manageOffer(orders);
 };
 
+const checkTrustline = async (acc, asset) => {
+    const account = await Horizon.loadAccount(acc.publicKey());
+    return !!_.find(account.balances, el => el.asset_code == asset.code && el.asset_issuer == asset.issuer);
+}
+
 async function populatePair(asset1, asset2) {
     const fee = await Horizon.fetchBaseFee();
-    console.log('FEE: ', fee);
+
+    console.log(`Populating pair ${asset1.asset.code} and ${asset2.asset.code}`)
 
     prepareOrderbook(fee, asset1, asset2);
 }
@@ -165,18 +228,8 @@ export async function populate() {
     };
 
     console.log("========== POPULATING ==========");
-    console.log("[] Preparing pairs...");
+    console.log("Preparing pairs...");
     const pairs = await preparePairs(getPairs());
-
-    // TODO: dont create trustlines if they exist
-
-    // console.log("[] Changing trustlines...");
-
-    // const trustlinePromises = pairs.map(el => {
-    //     changeTrust(el.selling.distributor, el.buying.asset, fee);
-    // });
-
-    // for (let promise of trustlinePromises) callTasks(promise);
 
     const promises = pairs.map(el => populatePair(el.buying, el.selling))
       

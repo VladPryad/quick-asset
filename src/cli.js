@@ -1,6 +1,8 @@
 import arg from 'arg';
-import { issue as startIssue } from './index.js';
-import { populate as startPopulate } from './populate.js';
+import {
+  issue as startIssue,
+  populate as startPopulate
+} from './index.js';
 
 function parseArgumentsIntoOptions(rawArgs) {
  const args = arg(
@@ -23,13 +25,14 @@ function parseArgumentsIntoOptions(rawArgs) {
  };
 }
 
-export function cli(args) {
+export async function cli(args) {
     let options = parseArgumentsIntoOptions(args);
     const { all, populate, issue } = options;
 
     switch(true) {
         case all:
-            console.error("Not implemented");
+            startIssue()
+            .then(() => startPopulate());
             break;
         case populate:
             startPopulate();

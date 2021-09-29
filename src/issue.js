@@ -87,25 +87,30 @@ const distributeAsset = async (asset, fee) => {
     return Horizon.submitTransaction(transaction);
 };
 
-export async function issue(code) {
+export async function issue() {
     console.log("========== ISSUING ==========");
 
     const fee = await Horizon.fetchBaseFee();
-    console.log('FEE: ', fee);
 
-    if (!code) {
-        assets.forEach( async asset => {
-            console.log(`[${asset.code}]:`,"Preparing accounts.")
-            await initAsset(asset);
+    function startIssuing(asset) {
+        return new Promise(async (res, rej) => {
+            console.log(`[${asset.code}]:`,"Preparing accounts...")
+        await initAsset(asset);
 
-            console.log(`[${asset.code}]:`,"Saving credentials.")
-            saveCreds(asset);
+        console.log(`[${asset.code}]:`,"Saving credentials...")
+        saveCreds(asset);
 
-            console.log(`[${asset.code}]:`,"Changing distributors trustlines.")
-            await createDistributor(asset, fee);
+        console.log(`[${asset.code}]:`,"Changing distributors trustlines...")
+        await createDistributor(asset, fee);
 
-            console.log(`[${asset.code}]:`,"Distributing asset.")
-            await distributeAsset(asset, fee);
-        });
+        console.log(`[${asset.code}]:`,"Distributing asset...")
+        await distributeAsset(asset, fee);
+
+        res(true);
+        })
     }
+    const promises = assets.map(startIssuing);
+
+    return Promise.all(promises);
+
 }
