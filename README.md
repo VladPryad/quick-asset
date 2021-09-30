@@ -89,7 +89,7 @@ So if you want to create assets A, B and C and create offers between them, you n
       issuer: 
       distributor: SC6R773OZEEHP4T5QUV3RDGNYYFW5H3HZ5PS6QOWWFPSENSVL3
 ```
-5) run npx @vladpryad/quick --populate
+5) run npx @vladpryad/quick --populate   
 6*) native XLM asset always goes with empty "issuer" field, but it needs "distributor" in pairs section either. 
 
 Sometimes Stellar network randomly/due to timeout rejects some transactions, so if you expose "tx_bad_seq" error and 'op_[buy/sell]no_trust', just run the script few more times.
