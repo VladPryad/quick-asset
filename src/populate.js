@@ -28,10 +28,10 @@ const validSeed = seed => StrKey.isValidEd25519SecretSeed(seed);
 
 const Horizon = initHorizon();
 
-const FEE_PRICE = '2.5';
-const FEE_PRICE_STEP = '0.1';
-const FEE_VOLUME_START = '0.2';
-const FEE_ITERATION = 2; // 75
+const PRICE = '2.5';
+const PRICE_STEP = '0.1';
+const VOLUME_START = '0.2';
+const ITERATION = 50; // 75
 
 const changeTrust = async (trustor, asset, fee, trustorAsset = undefined) => {
     if (asset.code == "XLM") return;
@@ -223,9 +223,9 @@ async function accountExists(acc) {
         return true;
     };
 
-    const prices = _.map(_.range(0, FEE_ITERATION), i => new BigNumber(FEE_PRICE).plus(new BigNumber(FEE_PRICE_STEP).times(new BigNumber(i))).toPrecision(7));
-    const volumes = [FEE_VOLUME_START];
-    for (var i = 1; i < FEE_ITERATION; i++) {
+    const prices = _.map(_.range(0, ITERATION), i => new BigNumber(PRICE).plus(new BigNumber(PRICE_STEP).times(new BigNumber(i))).toPrecision(7));
+    const volumes = [VOLUME_START];
+    for (var i = 1; i < ITERATION; i++) {
         volumes.push(new BigNumber(volumes[i - 1]).times(new BigNumber('1.25')).toPrecision(7));
     }
 
