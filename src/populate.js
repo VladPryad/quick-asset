@@ -33,7 +33,8 @@ const FEE_PRICE_STEP = '0.1';
 const FEE_VOLUME_START = '0.2';
 const FEE_ITERATION = 2; // 75
 
-const changeTrust = async (trustor, asset, fee) => {
+const changeTrust = async (trustor, asset, fee, trustorAsset = undefined) => {
+    if (asset.code == "XLM") return;
 
     console.log("Allowing trust on " + asset.code);
 
@@ -51,26 +52,30 @@ const changeTrust = async (trustor, asset, fee) => {
     try {
         await Horizon.submitTransaction(transaction);
     } catch(e) {
-        console.log("ERROR IN TRUSTLINE CREATION: ", e.response.data.extras);
+        console.log(`[${trustorAsset.code}] to [${asset.code}] ERROR IN TRUSTLINE CREATION: `, e.response.data.extras ? e.response.data.extras : e.response.data);
     }
 };
 
 const initiatedAssets = [];
 
 export async function initAsset(asset) {
-    const existingAsset = _.find(initiatedAssets, el => el.asset.code == asset.code && el.issuer.publicKey() == asset.issuer);
+    const existingAsset = _.find(initiatedAssets, el => el.asset.code == asset.code);
     if ( existingAsset ) return existingAsset;
 
-    console.log(initiatedAssets)
+    //console.log(initiatedAssets)
 
-    if( !asset.issuer) {
-        console.log(`No issuer for ${asset.code}, using random.`)
-        asset.issuer = Keypair.random();
-    } else if (!validSeed(asset.issuer)) {
-        console.log(`Invalid issuer for ${asset.code}, using random.`)
-        asset.issuer = Keypair.random();
+    if (asset.code != "XLM") {
+        if( !asset.issuer) {
+            console.log(`No issuer for ${asset.code}, using random.`)
+            asset.issuer = Keypair.random();
+        } else if (!validSeed(asset.issuer)) {
+            console.log(`Invalid issuer for ${asset.code}, using random.`)
+            asset.issuer = Keypair.random();
+        } else {
+            asset.issuer = Keypair.fromSecret(asset.issuer); 
+        }
     } else {
-        asset.issuer = Keypair.fromSecret(asset.issuer); 
+        asset.issuer = null;
     }
 
     if( !asset.distributor) {
@@ -85,10 +90,14 @@ export async function initAsset(asset) {
 
     console.log("Checking if accounts exist...");
 
-    if ( !(await accountExists(asset.issuer))) fundAccount(asset.issuer);
+    if ( asset.code != "XLM" && !(await accountExists(asset.issuer))) await fundAccount(asset.issuer);
     if ( !(await accountExists(asset.distributor))) await fundAccount(asset.distributor);
 
-    asset.asset = new Asset(asset.code, asset.issuer.publicKey());
+    if (asset.code  == "XLM") {
+        asset.asset = Asset.native();
+    } else {
+        asset.asset = new Asset(asset.code, asset.issuer.publicKey());
+    }
 
     initiatedAssets.push(asset);
 
@@ -96,7 +105,9 @@ export async function initAsset(asset) {
 }
 
 async function preparePairs(raw) {
-    const pairs = [];
+    if (!raw.single) raw.single = [];
+    if (!raw.cross) raw.cross = [];
+
     const fee = await Horizon.fetchBaseFee();
     function makePairs(arr) {
         var res = [],
@@ -112,50 +123,68 @@ async function preparePairs(raw) {
     ...crossPairsSequential.map(el => ({buying: el[0], selling: el[1] })),
     ...crossPairsSequential.map(el => ({buying: el[1], selling: el[0] })) ];
 
-    function createPair(pair) {
-        return new Promise(async (res, rej) => {
-            const buying = await initAsset(pair.buying);
-            const selling = await initAsset(pair.selling);
+    const assets = _.uniqBy(rawPairs.flatMap(el => [el.selling, el.buying]), el => el.code + el.issuer + el.distributor);
 
-            pairs.push({
-                buying,
-                selling,
-            })
-            res(true);
+    function createAsset(asset) {
+        return new Promise(async (res, rej) => {
+            const created = await initAsset(asset);
+            res(created);
         })
     }
 
     function changeTrustlines(pair) {
         return new Promise(async (res, rej) => {
-            console.log(`Checking trustlines between ${pair.buying.asset.code} and ${pair.selling.asset.code} distributors ...`);
-            if (!(await checkTrustline(pair.buying.distributor, pair.selling.asset))) {
-                await changeTrust(pair.buying.distributor, pair.selling.asset, fee);
-            }
+
+            console.log(`Checking trustlines between ${pair.buying.asset.code} and ${pair.selling.asset.code} ...`);
+            // if (!(await checkTrustline(pair.buying.distributor, pair.selling.asset))) {
+            //     console.log(`No trust between ${pair.buying.asset.code} distributor and ${pair.selling.asset.code}`)
+            //     await changeTrust(pair.buying.distributor, pair.selling.asset, fee);
+            // }
             if (!(await checkTrustline(pair.selling.distributor, pair.buying.asset))) {
-                await changeTrust(pair.selling.distributor, pair.buying.asset, fee);
+                console.log(`No trust between ${pair.selling.asset.code} distributor and ${pair.buying.asset.code}`)
+                await changeTrust(pair.selling.distributor, pair.buying.asset, fee, pair.selling.asset);
             }
             res(true);
         })
     }
 
-    const promises = raw.single.map(createPair) // rawPairs
+    const promises = assets.map(createAsset);
 
     return Promise.all(promises)
-    .then(() => pairs)
+    .then((createdAssets) => 
+    {
+        return rawPairs.map(el => {
+            return {
+                selling: _.find(createdAssets, asset => el.selling.code == asset.code),
+                buying: _.find(createdAssets, asset => el.buying.code == asset.code)
+            }
+        })
+    })
     .then(pairs => {
+        console.log("PAIRS: ", pairs.map(el => {
+            try {
+                el.buying.issuer = el.buying.issuer == null ? "xlm" : el.buying.issuer.publicKey();
+                el.selling.issuer = el.selling.issuer == null ? "xlm" : el.selling.issuer.publicKey();
+            } catch(e) {
+
+            }
+            return {
+                buy: el.buying.code + " " + el.buying.issuer + " " + el.buying.distributor.publicKey(),
+                sell: el.selling.code + " " + el.selling.issuer + " " + el.selling.distributor.publicKey(),
+            };
+        }))
         const promisesTrust = pairs.map(changeTrustlines);
         return Promise.all(promisesTrust)
         .then(() => pairs);
     })
-
-    // TODO: remove repetitive elements
 }
 
 async function accountExists(acc) {
     try {
         await Horizon.loadAccount(acc.publicKey());
     } catch(e) {
-        return false;
+        if( e.response.status === 404 ) return false;
+        console.log("ERROR IN ACCOUNT CHECK: ", e);
     }
 
     return true;
@@ -179,12 +208,12 @@ async function accountExists(acc) {
 
         transaction.sign(selling.distributor);
 
-        console.log(`Submitting transaction for price: ${offer.price} & volume: ${offer.volume}`)
+        console.log(`[${buying.asset.code}/${selling.asset.code}] Submitting transaction for price: ${offer.price} & volume: ${offer.volume}`)
 
         try {
             await Horizon.submitTransaction(transaction);
         } catch(e) {
-            console.log("ERROR IN OFFER CREATION: ", e.response.data.extras);
+            console.log(`[${buying.asset.code}/${selling.asset.code}] ERROR IN OFFER CREATION: `, e.response.data.extras ? e.response.data.extras : e.response.data);
         }
 
         if (!_.isEmpty(offers)) {

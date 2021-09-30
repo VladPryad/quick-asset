@@ -19,14 +19,19 @@ import saveCreds from "./helpers/saveCreds.js";
 import { initHorizon } from "./helpers/horizon.js";
 
 async function initAsset(asset) {
-    if( !asset.issuer) {
-        console.log(`No issuer for ${asset.code}, using random.`)
-        asset.issuer = Keypair.random();
-    } else if (!validSeed(asset.issuer)) {
-        console.log(`Invalid issuer for ${asset.code}, using random.`)
-        asset.issuer = Keypair.random();
+
+    if (asset.code != "XLM") {
+        if( !asset.issuer) {
+            console.log(`No issuer for ${asset.code}, using random.`)
+            asset.issuer = Keypair.random();
+        } else if (!validSeed(asset.issuer)) {
+            console.log(`Invalid issuer for ${asset.code}, using random.`)
+            asset.issuer = Keypair.random();
+        } else {
+            asset.issuer = Keypair.fromSecret(asset.issuer); 
+        }
     } else {
-        asset.issuer = Keypair.fromSecret(asset.issuer); 
+        asset.issuer = null;
     }
 
     if( !asset.distributor) {
@@ -39,12 +44,19 @@ async function initAsset(asset) {
         asset.distributor = Keypair.fromSecret(asset.distributor); 
     }
 
-    await fundAccount(asset.issuer); // TODO: Only for testnet, no need to fund existing accounts
+    if ( asset.code != "XLM") fundAccount(asset.issuer); // TODO: Only for testnet, no need to fund existing accounts
     await fundAccount(asset.distributor); // TODO: Only for testnet
+
+    if (asset.code  == "XLM") {
+        asset.asset = Asset.native();
+    } else {
+        asset.asset = new Asset(asset.code, asset.issuer.publicKey());
+    }
 }
 
 export const fundAccount = async (pair) => {
-    return Horizon.friendbot(pair.publicKey()).call();
+    console.log("Starting funding " + pair.publicKey());
+    return await Horizon.friendbot(pair.publicKey()).call().catch((e) => console.log("ERROR IN FRIENDBOT: ", e.response, pair.publicKey()));
 };
 
 const validPk = pk => StrKey.isValidEd25519PublicKey(pk);
@@ -55,6 +67,13 @@ const Horizon = initHorizon();
 const assets = getAssets();
 
 const createDistributor = async (asset, fee) => {
+
+    if (asset.code == "XLM") {
+        console.log("Native asset, no need to trust ", asset.code);
+        return true;
+    }
+
+    console.log(`[${asset.code}]:`,"Changing distributors trustlines...")
 
     const account = await Horizon.loadAccount(asset.distributor.publicKey());
 
@@ -100,11 +119,15 @@ export async function issue() {
         console.log(`[${asset.code}]:`,"Saving credentials...")
         saveCreds(asset);
 
-        console.log(`[${asset.code}]:`,"Changing distributors trustlines...")
         await createDistributor(asset, fee);
 
-        console.log(`[${asset.code}]:`,"Distributing asset...")
-        await distributeAsset(asset, fee);
+        if (asset.code !== "XLM") {
+            console.log(`[${asset.code}]:`,"Distributing asset...")
+            await distributeAsset(asset, fee);
+        } else {
+            console.log("Native asset, no need to distribute ", asset.code);
+        }
+        
 
         res(true);
         })
